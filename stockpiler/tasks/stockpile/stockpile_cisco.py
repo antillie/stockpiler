@@ -105,7 +105,11 @@ def stockpile_cisco_asa(
         stockpiler.tasks.device_backup.StockpileResults object which is a dict-like object containing information on if
         backup was successful and what method was used, the config, etc.
     """
-
+    
+    # Change the backup command if we are running on a firepower device.
+    if is_firepower(task.host):
+        backup_command = "show configuration"
+    
     # Dict-like object of our eventual return info
     stockpile_info = StockpileResults(
         name=f"{task.host}_backup",
@@ -212,3 +216,8 @@ def stockpile_cisco_asa(
         logger.error("Failed to backup %s via HTTPS or SSH", task.host)
 
     return Result(host=task.host, result=stockpile_info, changed=False, failed=not stockpile_info["backup_successful"])
+
+def is_firepower(host):
+    if "FPR" in host.data["hardware_model"]:
+        return True
+    return False
