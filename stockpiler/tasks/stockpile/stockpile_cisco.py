@@ -9,6 +9,7 @@ import ipaddress
 from logging import getLogger
 import pathlib
 from urllib.parse import quote_plus
+import re
 
 
 from nornir.core.task import Result, Task
@@ -218,6 +219,12 @@ def stockpile_cisco_asa(
     return Result(host=task.host, result=stockpile_info, changed=False, failed=not stockpile_info["backup_successful"])
 
 def is_firepower(host):
-    if "FPR" in host.data["hardware_model"]:
-        return True
+    
+    regex_list = []
+    regex.append(re.compile("(?i)fpr"))
+    regex.append(re.compile("(?i)firepower"))
+    
+    for regex in regex_list:
+        if regex.search(host.data["hardware_model"]):
+            return True
     return False
