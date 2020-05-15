@@ -9,6 +9,7 @@ import ipaddress
 from logging import getLogger
 import pathlib
 from urllib.parse import quote_plus
+import re
 
 
 from nornir.core.task import Result, Task
@@ -105,7 +106,6 @@ def stockpile_cisco_asa(
         stockpiler.tasks.device_backup.StockpileResults object which is a dict-like object containing information on if
         backup was successful and what method was used, the config, etc.
     """
-
     # Dict-like object of our eventual return info
     stockpile_info = StockpileResults(
         name=f"{task.host}_backup",
@@ -115,7 +115,7 @@ def stockpile_cisco_asa(
         http_mgmt_port=task.host.get("http_mgmt_port", 8443),
         ssh_mgmt_port=task.host.get("port", 22) or 22,  # Need `or` statement as we're getting None from inventory
     )
-
+    
     # Check if we are using HTTP and if we can hit TCP port; skip if proxies, the TCP check won't do us any good.
     if stockpile_info["http_management"] and proxies is not None:
         stockpile_info["http_port_check_ok"] = True
@@ -144,7 +144,11 @@ def stockpile_cisco_asa(
     # Attempt backup via HTTPS if port check was OK (and it is configured for https management in inventory)
     if stockpile_info["http_port_check_ok"]:
         logger.debug("Attempting to backup %s:%s via HTTPS", task.host, stockpile_info["http_mgmt_port"])
-
+        
+        # Change the backup command if we are running on a firepower device.
+        if is_firepower(task.host):
+            backup_command = "show configuration"
+        
         # Disable TLS warnings if task.host.hostname is an IP address:
         try:
             _ = ipaddress.ip_address(task.host.hostname)
@@ -188,7 +192,11 @@ def stockpile_cisco_asa(
     # Attempt backup via SSH, if HTTPS fails or HTTPS management was not enabled.
     if not stockpile_info["backup_successful"] and stockpile_info["ssh_port_check_ok"]:
         logger.debug("Attempting to backup %s:%s via SSH", task.host, stockpile_info["ssh_mgmt_port"])
-
+        
+        # Change the backup command if we are running on a firepower device.
+        if is_firepower(task.host):
+            backup_command = "show configuration"
+        
         # Gather a backup:
         backup_results = task.run(task=netmiko_send_command, command_string=backup_command)
         if not backup_results[0].failed and "command authorization failed" not in backup_results[0].result.lower():
@@ -212,3 +220,14 @@ def stockpile_cisco_asa(
         logger.error("Failed to backup %s via HTTPS or SSH", task.host)
 
     return Result(host=task.host, result=stockpile_info, changed=False, failed=not stockpile_info["backup_successful"])
+
+def is_firepower(host):
+    
+    regex_list = []
+    regex.append(re.compile("(?i)fpr"))
+    regex.append(re.compile("(?i)fire\s*power"))
+    
+    for regex in regex_list:
+        if regex.search(host.data["hardware_model"]):
+            return True
+    return False
