@@ -144,7 +144,11 @@ def stockpile_cisco_asa(
     # Attempt backup via HTTPS if port check was OK (and it is configured for https management in inventory)
     if stockpile_info["http_port_check_ok"]:
         logger.debug("Attempting to backup %s:%s via HTTPS", task.host, stockpile_info["http_mgmt_port"])
-
+        
+        # Change the backup command if we are running on a firepower device.
+        if is_firepower(task.host):
+            backup_command = "show configuration"
+        
         # Disable TLS warnings if task.host.hostname is an IP address:
         try:
             _ = ipaddress.ip_address(task.host.hostname)
@@ -221,7 +225,7 @@ def is_firepower(host):
     
     regex_list = []
     regex.append(re.compile("(?i)fpr"))
-    regex.append(re.compile("(?i)firepower"))
+    regex.append(re.compile("(?i)fire\s*power"))
     
     for regex in regex_list:
         if regex.search(host.data["hardware_model"]):
