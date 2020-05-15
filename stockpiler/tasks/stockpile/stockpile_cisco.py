@@ -224,8 +224,8 @@ def stockpile_cisco_asa(
 def is_firepower(host):
     
     regex_list = []
-    regex.append(re.compile("(?i)fpr"))
-    regex.append(re.compile("(?i)fire\s*power"))
+    regex_list.append(re.compile("(?i)fpr"))
+    regex_list.append(re.compile("(?i)fire\s*power"))
     
     for regex in regex_list:
         if regex.search(host.data["hardware_model"]):
