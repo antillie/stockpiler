@@ -111,7 +111,7 @@ def stockpile_cisco_asa(
         name=f"{task.host}_backup",
         ip=task.host.hostname,
         hostname=task.host.get("device_name", task.host),
-        http_management=task.host.get("http_management", False),
+        http_management=task.host.get("http_management", True),
         http_mgmt_port=task.host.get("http_mgmt_port", 8443),
         ssh_mgmt_port=task.host.get("port", 22) or 22,  # Need `or` statement as we're getting None from inventory
     )
@@ -145,9 +145,12 @@ def stockpile_cisco_asa(
     if stockpile_info["http_port_check_ok"]:
         logger.debug("Attempting to backup %s:%s via HTTPS", task.host, stockpile_info["http_mgmt_port"])
         
-        # Change the backup command if we are running on a firepower device.
+        # Change the backup command if we are running on a firepower or context device.
         if is_firepower(task.host):
             backup_command = "show configuration"
+        
+        if is_context(task.host):
+            backup_command = "show run all"
         
         # Disable TLS warnings if task.host.hostname is an IP address:
         try:
@@ -193,9 +196,12 @@ def stockpile_cisco_asa(
     if not stockpile_info["backup_successful"] and stockpile_info["ssh_port_check_ok"]:
         logger.debug("Attempting to backup %s:%s via SSH", task.host, stockpile_info["ssh_mgmt_port"])
         
-        # Change the backup command if we are running on a firepower device.
+        # Change the backup command if we are running on a firepower or context device.
         if is_firepower(task.host):
             backup_command = "show configuration"
+        
+        if is_context(task.host):
+            backup_command = "show run all"
         
         # Gather a backup:
         backup_results = task.run(task=netmiko_send_command, command_string=backup_command)
@@ -226,6 +232,17 @@ def is_firepower(host):
     regex_list = []
     regex_list.append(re.compile("(?i)fpr"))
     regex_list.append(re.compile("(?i)fire\s*power"))
+    
+    for regex in regex_list:
+        if regex.search(host.data["hardware_model"]):
+            return True
+    return False
+
+def is_context(host):
+    
+    regex_list = []
+    regex_list.append(re.compile("(?i)ctx"))
+    regex_list.append(re.compile("(?i)context"))
     
     for regex in regex_list:
         if regex.search(host.data["hardware_model"]):
